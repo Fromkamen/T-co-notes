@@ -173,6 +173,25 @@
         align-items: center;
       }
     }
+
+    /* Подсветка при редактировании */
+    .note.pinned h3,
+    .note.pinned p {
+      outline: 2px dashed rgba(52, 150, 200, 0.4);
+      border-radius: 4px;
+      transition: outline 0.3s ease;
+      cursor: text;
+    }
+
+    .note.pinned h3:focus,
+    .note.pinned p:focus {
+      outline: 2px solid var(--primary-color);
+    }
+
+    .note:not(.pinned) h3,
+    .note:not(.pinned) p {
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -209,20 +228,14 @@
       // Заголовок
       const title = document.createElement('h3');
       title.innerText = note.title;
-      title.oninput = () => {
-        note.title = title.innerText;
-        note.updated = new Date().toISOString();
-        saveNotes();
-      };
+      title.contentEditable = note.pinned ? 'true' : 'false';
+      title.style.pointerEvents = note.pinned ? 'auto' : 'none';
 
       // Текст
       const text = document.createElement('p');
       text.innerText = note.text;
-      text.oninput = () => {
-        note.text = text.innerText;
-        note.updated = new Date().toISOString();
-        saveNotes();
-      };
+      text.contentEditable = note.pinned ? 'true' : 'false';
+      text.style.pointerEvents = note.pinned ? 'auto' : 'none';
 
       // Дата
       const date = document.createElement('small');
@@ -303,13 +316,37 @@
       document.addEventListener('mouseup', endDrag);
       document.addEventListener('touchend', endDrag);
 
-      // Цвет при клике
-      div.onclick = e => {
-        if (e.target.classList.contains('delete-btn') || e.target.classList.contains('pin-btn')) return;
-        const colors = ['#e2f0ff', '#ffe4e1', '#eaffea', '#fffac8'];
-        const current = colors.indexOf(div.style.backgroundColor);
-        div.style.backgroundColor = colors[(current + 1) % colors.length];
-        note.color = div.style.backgroundColor;
+      // Фокус по клику (заголовок и текст) с выделением всего содержимого
+      title.addEventListener('click', e => {
+        if (!note.pinned) return;
+        e.stopPropagation();
+        const range = document.createRange();
+        const selection = window.getSelection();
+        range.selectNodeContents(title);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      });
+
+      text.addEventListener('click', e => {
+        if (!note.pinned) return;
+        e.stopPropagation();
+        const range = document.createRange();
+        const selection = window.getSelection();
+        range.selectNodeContents(text);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      });
+
+      // Сохранение
+      title.oninput = () => {
+        note.title = title.innerText;
+        note.updated = new Date().toISOString();
+        saveNotes();
+      };
+
+      text.oninput = () => {
+        note.text = text.innerText;
+        note.updated = new Date().toISOString();
         saveNotes();
       };
 
@@ -324,12 +361,24 @@
 
       updateContentEditable(div, note.pinned);
 
+      // Добавляем элементы
       div.appendChild(title);
       div.appendChild(text);
       div.appendChild(date);
       div.appendChild(delBtn);
       div.appendChild(pinBtn);
       board.appendChild(div);
+
+      // Автофокус при создании
+      if (note.pinned && note.created === note.updated) {
+        setTimeout(() => {
+          const range = document.createRange();
+          const selection = window.getSelection();
+          range.selectNodeContents(title);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }, 100);
+      }
     });
   }
 
@@ -358,6 +407,14 @@
 
   function searchNotes(query) {
     renderNotes(query);
+  }
+
+  function updateContentEditable(container, editable) {
+    const els = container.querySelectorAll('h3, p');
+    els.forEach(el => {
+      el.contentEditable = editable ? 'true' : 'false';
+      el.style.pointerEvents = editable ? 'auto' : 'none';
+    });
   }
 
   renderNotes();
